@@ -1,106 +1,133 @@
 package com.example.samuraitravel.controller;
 
-import org.springframework.data.domain.Page; // ページネーション用
-import org.springframework.data.domain.Pageable; // ページ情報
-import org.springframework.data.domain.Sort.Direction; // 並び順の方向（ASC/DESC）
-import org.springframework.data.web.PageableDefault; // ページネーションのデフォルト設定
-import org.springframework.stereotype.Controller; // コントローラのアノテーション
-import org.springframework.ui.Model; // ビューにデータを渡すためのオブジェクト
-import org.springframework.web.bind.annotation.GetMapping; // GETリクエスト用のマッピング
-import org.springframework.web.bind.annotation.PathVariable; // パス変数を取得するためのアノテーション
-import org.springframework.web.bind.annotation.RequestMapping; // コントローラのベースURLを設定
-import org.springframework.web.bind.annotation.RequestParam; // クエリパラメータを取得するためのアノテーション
+import java.util.List;
 
-import com.example.samuraitravel.entity.House; // 民宿エンティティ
-import com.example.samuraitravel.form.ReservationInputForm; // 予約入力フォームクラス
-import com.example.samuraitravel.repository.HouseRepository; // 民宿リポジトリ
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort.Direction;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
-/**
- * 民宿の一覧表示・詳細表示を管理するコントローラクラス。
- */
+import com.example.samuraitravel.entity.Favorite;
+import com.example.samuraitravel.entity.House;
+import com.example.samuraitravel.entity.Review;
+import com.example.samuraitravel.entity.User;
+import com.example.samuraitravel.form.ReservationInputForm;
+import com.example.samuraitravel.repository.FavoriteRepository;
+import com.example.samuraitravel.repository.HouseRepository;
+import com.example.samuraitravel.repository.ReviewRepository;
+import com.example.samuraitravel.security.UserDetailsImpl;
+import com.example.samuraitravel.service.FavoriteService;
+import com.example.samuraitravel.service.ReviewService;
+
 @Controller
-@RequestMapping("/houses") // このコントローラのURLパスのベースを "/houses" に設定
+@RequestMapping("/houses")
 public class HouseController {
-    private final HouseRepository houseRepository; // 民宿データ操作用リポジトリ
-    
-    /**
-     * コンストラクタ
-     * @param houseRepository 民宿データを操作するためのリポジトリ
-     */
-    public HouseController(HouseRepository houseRepository) {
-        this.houseRepository = houseRepository;            
-    }     
-  
-    /**
-     * 民宿の一覧ページを表示するメソッド。
-     * @param keyword 民宿名や住所の検索キーワード（任意）
-     * @param area エリアの検索キーワード（任意）
-     * @param price 予算の上限（任意）
-     * @param order ソート順（任意、価格昇順/作成日時降順）
-     * @param pageable ページネーション情報
-     * @param model ビューに渡すデータを格納するオブジェクト
-     * @return houses/index テンプレート名
-     */
-    @GetMapping
-    public String index(@RequestParam(name = "keyword", required = false) String keyword,
-                        @RequestParam(name = "area", required = false) String area,
-                        @RequestParam(name = "price", required = false) Integer price,  
-                        @RequestParam(name = "order", required = false) String order,
-                        @PageableDefault(page = 0, size = 10, sort = "id", direction = Direction.ASC) Pageable pageable,
-                        Model model) 
-    {
-        Page<House> housePage; // ページングされた民宿データを格納
-        
-        // 検索条件に基づいてデータを取得
-        if (keyword != null && !keyword.isEmpty()) {            
-            if (order != null && order.equals("priceAsc")) {
-                housePage = houseRepository.findByNameLikeOrAddressLikeOrderByPriceAsc("%" + keyword + "%", "%" + keyword + "%", pageable);
-            } else {
-                housePage = houseRepository.findByNameLikeOrAddressLikeOrderByCreatedAtDesc("%" + keyword + "%", "%" + keyword + "%", pageable);
-            }            
-        } else if (area != null && !area.isEmpty()) {            
-            if (order != null && order.equals("priceAsc")) {
-                housePage = houseRepository.findByAddressLikeOrderByPriceAsc("%" + area + "%", pageable);
-            } else {
-                housePage = houseRepository.findByAddressLikeOrderByCreatedAtDesc("%" + area + "%", pageable);
-            }            
-        } else if (price != null) {            
-            if (order != null && order.equals("priceAsc")) {
-                housePage = houseRepository.findByPriceLessThanEqualOrderByPriceAsc(price, pageable);
-            } else {
-                housePage = houseRepository.findByPriceLessThanEqualOrderByCreatedAtDesc(price, pageable);
-            }            
-        } else {            
-            if (order != null && order.equals("priceAsc")) {
-                housePage = houseRepository.findAllByOrderByPriceAsc(pageable);
-            } else {
-                housePage = houseRepository.findAllByOrderByCreatedAtDesc(pageable);   
-            }            
-        }                
-        
-        // ビューにデータを渡す
-        model.addAttribute("housePage", housePage); // ページングされた民宿データ
-        model.addAttribute("keyword", keyword); // 検索キーワード
-        model.addAttribute("area", area); // エリア情報
-        model.addAttribute("price", price); // 価格情報
-        model.addAttribute("order", order); // ソート順
-        
-        return "houses/index"; // ビュー名を返す
-    }
-    
-    /**
-     * 民宿の詳細ページを表示するメソッド。
-     * @param id 民宿ID
-     * @param model ビューに渡すデータを格納するオブジェクト
-     * @return houses/show テンプレート名
-     */
-    @GetMapping("/{id}")
-    public String show(@PathVariable(name = "id") Integer id, Model model) {
-        House house = houseRepository.getReferenceById(id); // 民宿データを取得
-        
-        model.addAttribute("house", house); // 民宿情報をビューに渡す
-        model.addAttribute("reservationInputForm", new ReservationInputForm()); // 予約入力フォームをビューに渡す
-        
-        return "houses/show"; // ビュー名を返す
-    }    
+	private final HouseRepository houseRepository;
+	private final ReviewRepository reviewRepository;
+	private final ReviewService reviewService;
+	private final FavoriteRepository favoriteRepository;
+	private final FavoriteService favoriteService;
+
+	public HouseController(HouseRepository houseRepository, ReviewRepository reviewRepository,
+			ReviewService reviewService, FavoriteRepository favoriteRepository, FavoriteService favoriteService) {
+		this.houseRepository = houseRepository;
+		this.reviewRepository = reviewRepository;
+		this.reviewService = reviewService;
+		this.favoriteRepository = favoriteRepository;
+		this.favoriteService = favoriteService;
+	}
+
+	@GetMapping
+	public String index(@RequestParam(name = "keyword", required = false) String keyword,
+			@RequestParam(name = "area", required = false) String area,
+			@RequestParam(name = "price", required = false) Integer price,
+			@RequestParam(name = "order", required = false) String order,
+			@PageableDefault(page = 0, size = 10, sort = "id", direction = Direction.ASC) Pageable pageable,
+			Model model) {
+		Page<House> housePage;
+
+		if (keyword != null && !keyword.isEmpty()) {
+			if (order != null && order.equals("priceAsc")) {
+				housePage = houseRepository.findByNameLikeOrAddressLikeOrderByPriceAsc("%" + keyword + "%",
+						"%" + keyword + "%", pageable);
+			} else {
+				housePage = houseRepository.findByNameLikeOrAddressLikeOrderByCreatedAtDesc("%" + keyword + "%",
+						"%" + keyword + "%", pageable);
+			}
+		} else if (area != null && !area.isEmpty()) {
+			if (order != null && order.equals("priceAsc")) {
+				housePage = houseRepository.findByAddressLikeOrderByPriceAsc("%" + area + "%", pageable);
+			} else {
+				housePage = houseRepository.findByAddressLikeOrderByCreatedAtDesc("%" + area + "%", pageable);
+			}
+		} else if (price != null) {
+			if (order != null && order.equals("priceAsc")) {
+				housePage = houseRepository.findByPriceLessThanEqualOrderByPriceAsc(price, pageable);
+			} else {
+				housePage = houseRepository.findByPriceLessThanEqualOrderByCreatedAtDesc(price, pageable);
+			}
+		} else {
+			if (order != null && order.equals("priceAsc")) {
+				housePage = houseRepository.findAllByOrderByPriceAsc(pageable);
+			} else {
+				housePage = houseRepository.findAllByOrderByCreatedAtDesc(pageable);
+			}
+		}
+
+		model.addAttribute("housePage", housePage);
+		model.addAttribute("keyword", keyword);
+		model.addAttribute("area", area);
+		model.addAttribute("price", price);
+		model.addAttribute("order", order);
+
+		return "houses/index";
+	}
+
+	@GetMapping("/{id}")
+	public String show(@PathVariable(name = "id") Integer id, Model model,
+			@AuthenticationPrincipal UserDetailsImpl userDetailsImpl) {
+                      
+		House house = houseRepository.getReferenceById(id);
+                      
+		// レビュー済みフラグとお気に入りフラグを初期化
+		boolean reviewFlag = false;
+		boolean favoriteFlag = false;
+		Favorite favorite = null;
+
+		// ユーザーがログインしている場合の処理
+		if (userDetailsImpl != null) {
+			User user = userDetailsImpl.getUser();
+			reviewFlag = reviewService.hasUserAlreadyReviewed(house, user);
+			favoriteFlag = favoriteService.isFavorite(house, user);
+
+			if (favoriteFlag) {
+				favorite = favoriteRepository.findByHouseAndUser(house, user);
+			}
+		}
+
+		// モデルにフラグとお気に入り情報を追加
+		model.addAttribute("reviewFlag", reviewFlag);
+		model.addAttribute("favoriteFlag", favoriteFlag);
+		model.addAttribute("favorite", favorite);
+
+		// レビュー情報を取得してモデルに追加
+		List<Review> reviewList = reviewRepository.findTop6ByHouseOrderByCreatedAtDesc(house);
+		model.addAttribute("reviewList", reviewList);
+
+		int totalCount = (int) reviewRepository.countByHouse(house);
+		model.addAttribute("totalCount", totalCount);
+
+		// 民宿情報と予約フォームをモデルに追加
+		model.addAttribute("house", house);
+		model.addAttribute("reservationInputForm", new ReservationInputForm());
+
+		return "houses/show";
+	}
 }
