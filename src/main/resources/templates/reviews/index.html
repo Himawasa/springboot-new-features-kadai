@@ -45,7 +45,7 @@
                                                         <!-- 編集リンク -->
                                                         <a th:href="@{/houses/{houseId}/reviews/{reviewId}/edit(houseId=${house.getId()}, reviewId=${review.getId()})}" class="samuraitravel-link">編集</a>
                                                         <!-- 削除リンク（モーダルを開く） -->
-                                                        <a href="#" class="samuraitravel-link-danger" data-bs-toggle="modal" th:data-bs-target="#deleteReviewModal-${review.getId()}">削除</a>
+                                                        <a href="#" class="samuraitravel-link-danger" data-bs-toggle="modal" th:data-bs-target="${'#deleteReviewModal-' + review.getId()}">削除</a>
                                                         <!-- 削除用モーダル -->
                                                         <div class="modal fade" th:id="'deleteReviewModal-' + ${review.getId()}" tabindex="-1" aria-labelledby="deleteReviewLabel" aria-hidden="true">
                                                             <div class="modal-dialog">
